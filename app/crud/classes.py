@@ -37,3 +37,16 @@ async def delete_class(class_id):
     await conn.execute("DELETE FROM classes WHERE id = $1", class_id)
     await conn.close()
     return True
+
+async def get_classes_students_counts():
+    conn = await get_connection()
+    query= """
+        SELECT c.id, c.name, COUNT(s.id) AS student_count
+        FROM classes c
+        LEFT JOIN students s ON c.id = s.class_id
+        GROUP BY c.id, c.name
+        ORDER BY c.id;
+    """
+    result = await conn.fetch(query)
+    await  conn.close()
+    return [dict(row) for row in result]
