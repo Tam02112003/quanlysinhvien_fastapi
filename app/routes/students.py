@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Query, HTTPException
 from app.schemas.student import StudentCreate, StudentOut
-from app.crud import students,search
+from app.crud import students
 from app.crud.search import find_student_with_class_by_name
 
 router = APIRouter(prefix="/students", tags=["Students"])

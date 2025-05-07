@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from app.routes import students, classes
-from app.routes import search
-app = FastAPI(title="Student-Class-Search Management API")
+from app.routes import students, classes,search,auth
+app = FastAPI(title="Auth-Student-Class-Search Management API")
 
 app.include_router(students.router)
 app.include_router(classes.router)
 app.include_router(search.router)
+app.include_router(auth.router)
