@@ -1,12 +1,13 @@
-from fastapi import APIRouter,Query, HTTPException
+from fastapi import APIRouter,Query, HTTPException,Request
 from app.schemas.student import StudentCreate, StudentOut
 from app.crud import students
 from app.crud.search import find_student_with_class_by_name
-
+from app.auth.auth_wrapper import auth_required
 router = APIRouter(prefix="/students", tags=["Students"])
 
 @router.post("/", response_model=StudentOut)
-async def create(student: StudentCreate):
+@auth_required
+async def create(request: Request,student: StudentCreate):
     return await students.create_student(student)
 
 @router.get("/search")
@@ -18,7 +19,8 @@ async def search_student_by_name(name: str = Query(..., description="Tên sinh v
 
 
 @router.get("/", response_model=list[StudentOut])
-async def get_all():
+@auth_required
+async def get_all(request:Request):
     return await students.get_all_students()
 
 @router.get("/{student_id}", response_model=StudentOut)
@@ -36,6 +38,7 @@ async def update(student_id: int, student: StudentCreate):
     return s
 
 @router.delete("/{student_id}")
-async def delete(student_id: int):
+@auth_required
+async def delete(request: Request,student_id: int):
     await students.delete_student(student_id)
     return {"message": "Deleted"}

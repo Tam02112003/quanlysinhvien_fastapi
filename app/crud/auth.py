@@ -1,5 +1,6 @@
 from app.database import get_connection
-from app.utils.security import hash_password
+from app.utils.security import hash_password, verify_password
+
 
 async def register_user(name: str, email: str, password: str):
     conn = await get_connection()
@@ -17,11 +18,22 @@ async def register_user(name: str, email: str, password: str):
     await conn.close()
     return row
 
+from app.utils.security import verify_password  # dùng passlib để kiểm tra
+
 async def authenticate_user(email: str, password: str):
     conn = await get_connection()
-    hashed = hash_password(password)
-    row = await conn.fetchrow("""
-        SELECT id, username, email FROM users WHERE email=$1 AND  hashed_password=$2
-    """, email, hashed)
+    user = await conn.fetchrow("SELECT * FROM users WHERE email=$1", email)
     await conn.close()
-    return row
+
+    if not user:
+        return None
+
+    if not verify_password(password, user["hashed_password"]):
+        return None
+
+    # Trả lại thông tin user cần thiết
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "email": user["email"]
+    }

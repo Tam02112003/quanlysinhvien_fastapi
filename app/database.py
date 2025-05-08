@@ -1,3 +1,4 @@
+import os
 import asyncpg
 
 DATABASE_URL = "postgresql://postgres:minhtam123@localhost:5432/studentdb"

@@ -1,8 +1,7 @@
 import jwt
 from datetime import datetime, timedelta
+from app.config import SECRET_KEY, ALGORITHM
 
-SECRET_KEY = "quanlysinhvien"
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 def create_access_token(data: dict):
     to_encode = data.copy()

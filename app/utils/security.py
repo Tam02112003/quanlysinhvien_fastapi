@@ -1,4 +1,16 @@
-import hashlib
+from passlib.context import CryptContext
+
+# Tạo context mã hóa với bcrypt
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    """
+    Mã hóa mật khẩu dạng bcrypt
+    """
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    So sánh mật khẩu người dùng nhập với mật khẩu đã mã hóa
+    """
+    return pwd_context.verify(plain_password, hashed_password)
