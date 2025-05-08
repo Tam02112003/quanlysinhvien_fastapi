@@ -1,7 +1,12 @@
 from fastapi import Request, HTTPException
 from functools import wraps
 from jose import jwt, JWTError
-from app.config import SECRET_KEY, ALGORITHM
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+ALGORITHM= os.getenv("ALGORITHM")
+SECRET_KEY= os.getenv("SECRET_KEY")
 
 def auth_required(func):
     @wraps(func)
