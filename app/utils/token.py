@@ -1,7 +1,10 @@
+import os
 import jwt
 from datetime import datetime, timedelta
-from app.config import SECRET_KEY, ALGORITHM
-
+from dotenv import load_dotenv
+load_dotenv()
+ALGORITHM= os.getenv("ALGORITHM")
+SECRET_KEY= os.getenv("SECRET_KEY")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 def create_access_token(data: dict):
     to_encode = data.copy()

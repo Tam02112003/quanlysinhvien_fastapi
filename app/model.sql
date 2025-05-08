@@ -12,3 +12,5 @@ CREATE TABLE students (
     date_of_birth DATE,
     class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL
 );
+
+
