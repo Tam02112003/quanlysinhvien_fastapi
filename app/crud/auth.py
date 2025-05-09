@@ -4,7 +4,7 @@ from app.utils.security import hash_password, verify_password
 
 async def register_user(name: str, email: str, password: str):
     conn = await get_connection()
-    existing = await conn.fetchrow("SELECT * FROM users WHERE email=$1", email)
+    existing = await conn.fetchrow("SELECT 1 FROM users WHERE email=$1", email)
     if existing:
         await conn.close()
         return None  # Email đã tồn tại
@@ -18,11 +18,10 @@ async def register_user(name: str, email: str, password: str):
     await conn.close()
     return row
 
-from app.utils.security import verify_password  # dùng passlib để kiểm tra
 
 async def authenticate_user(email: str, password: str):
     conn = await get_connection()
-    user = await conn.fetchrow("SELECT * FROM users WHERE email=$1", email)
+    user = await conn.fetchrow("SELECT id, username, email, hashed_password  FROM users WHERE email=$1", email)
     await conn.close()
 
     if not user:
