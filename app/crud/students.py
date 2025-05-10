@@ -1,40 +1,76 @@
 from app.database import get_connection
+from fastapi import HTTPException
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def create_student(data):
-    conn = await get_connection()
-    query = """
-        INSERT INTO students (name, email, date_of_birth, class_id)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, name, email, date_of_birth, class_id;
-    """
-    student = await conn.fetchrow(query, data.name, data.email, data.date_of_birth, data.class_id)
-    await conn.close()
-    return dict(student)
+    async with get_connection() as conn:
+        try:
+            stmt = await conn.prepare("""
+                INSERT INTO students (name, email, date_of_birth, class_id)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id, name, email, date_of_birth, class_id;
+            """)
+            student = await stmt.fetchrow(
+                data.name, data.email, data.date_of_birth, data.class_id
+            )
+            return dict(student)
+        except Exception as e:
+            logger.error(f"Create student error: {e}")
+            raise HTTPException(status_code=500, detail="Database error")
 
 async def get_all_students():
-    conn = await get_connection()
-    students = await conn.fetch("SELECT id, name, email, date_of_birth, class_id FROM students")
-    await conn.close()
-    return [dict(s) for s in students]
+    async with get_connection() as conn:
+        try:
+            stmt = await conn.prepare("""
+                SELECT id, name, email, date_of_birth, class_id 
+                FROM students
+            """)
+            students = await stmt.fetch()
+            return [dict(s) for s in students]
+        except Exception as e:
+            logger.error(f"Get all students error: {e}")
+            raise HTTPException(status_code=500, detail="Database error")
 
 async def get_student_by_id(student_id):
-    conn = await get_connection()
-    student = await conn.fetchrow("SELECT id, name, email, date_of_birth, class_id FROM students WHERE id = $1", student_id)
-    await conn.close()
-    return dict(student) if student else None
+    async with get_connection() as conn:
+        try:
+            stmt = await conn.prepare("""
+                SELECT id, name, email, date_of_birth, class_id 
+                FROM students WHERE id = $1
+            """)
+            student = await stmt.fetchrow(student_id)
+            return dict(student) if student else None
+        except Exception as e:
+            logger.error(f"Get student error: {e}")
+            raise HTTPException(status_code=500, detail="Database error")
 
 async def update_student(student_id, data):
-    conn = await get_connection()
-    query = """
-        UPDATE students SET name=$1, email=$2, date_of_birth=$3, class_id=$4
-        WHERE id=$5 RETURNING id, name, email, date_of_birth, class_id;
-    """
-    updated = await conn.fetchrow(query, data.name, data.email, data.date_of_birth, data.class_id, student_id)
-    await conn.close()
-    return dict(updated) if updated else None
+    async with get_connection() as conn:
+        try:
+            stmt = await conn.prepare("""
+                UPDATE students 
+                SET name=$1, email=$2, date_of_birth=$3, class_id=$4
+                WHERE id=$5 
+                RETURNING id, name, email, date_of_birth, class_id;
+            """)
+            updated = await stmt.fetchrow(
+                data.name, data.email, data.date_of_birth, data.class_id, student_id
+            )
+            return dict(updated) if updated else None
+        except Exception as e:
+            logger.error(f"Update student error: {e}")
+            raise HTTPException(status_code=500, detail="Database error")
 
 async def delete_student(student_id):
-    conn = await get_connection()
-    await conn.execute("DELETE FROM students WHERE id = $1", student_id)
-    await conn.close()
-    return True
+    async with get_connection() as conn:
+        try:
+            stmt = await conn.prepare("""
+                DELETE FROM students WHERE id = $1
+            """)
+            await stmt.execute(student_id)
+            return True
+        except Exception as e:
+            logger.error(f"Delete student error: {e}")
+            raise HTTPException(status_code=500, detail="Database error")

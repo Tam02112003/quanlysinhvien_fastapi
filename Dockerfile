@@ -1,5 +1,7 @@
 FROM python:3.13.3-slim
 
+RUN uv pip install uvloop uvicorn
+
 WORKDIR /app
 
 # Cài curl và các gói cần thiết khác
