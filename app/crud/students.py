@@ -1,24 +1,50 @@
 from app.database import get_connection
 from fastapi import HTTPException
 import logging
-
+import asyncpg
 logger = logging.getLogger(__name__)
 
-async def create_student(data):
-    async with get_connection() as conn:
-        try:
-            stmt = await conn.prepare("""
-                INSERT INTO students (name, email, date_of_birth, class_id)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id, name, email, date_of_birth, class_id;
-            """)
-            student = await stmt.fetchrow(
-                data.name, data.email, data.date_of_birth, data.class_id
+
+async def create_student(student_data):
+    conn = await asyncpg.connect(...)
+    try:
+        # Kiểm tra trước khi insert
+        exists = await conn.fetchval(
+            "SELECT 1 FROM students WHERE email = $1 LIMIT 1",
+            student_data.email
+        )
+
+        if exists:
+            raise HTTPException(
+                status_code=400,
+                detail="Email đã tồn tại trong hệ thống"
             )
-            return dict(student)
-        except Exception as e:
-            logger.error(f"Create student error: {e}")
-            raise HTTPException(status_code=500, detail="Database error")
+
+        # Sử dụng UPSERT pattern
+        student_id = await conn.fetchval(
+            """INSERT INTO students(name, email, date_of_birth, class_id)
+            VALUES($1, $2, $3, $4)
+            ON CONFLICT (email) DO UPDATE
+            SET name = EXCLUDED.name,
+                date_of_birth = EXCLUDED.date_of_birth,
+                class_id = EXCLUDED.class_id
+            RETURNING id""",
+            student_data.name,
+            student_data.email,
+            student_data.date_of_birth,
+            student_data.class_id
+        )
+
+        return student_id
+
+    except asyncpg.UniqueViolationError as e:
+        logger.error(f"Lỗi trùng lặp email: {e}")
+        raise HTTPException(
+            status_code=409,
+            detail="Xung đột dữ liệu: Email đã tồn tại"
+        )
+    finally:
+        await conn.close()
 
 async def get_all_students():
     async with get_connection() as conn:

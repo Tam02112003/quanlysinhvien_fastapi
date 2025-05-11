@@ -2,7 +2,7 @@ from app.database import get_connection
 from app.utils.security import hash_password, verify_password
 from fastapi import HTTPException
 import logging
-
+from fastapi.concurrency import run_in_threadpool
 logger = logging.getLogger(__name__)
 
 async def register_user(name: str, email: str, password: str):
@@ -37,8 +37,9 @@ async def authenticate_user(email: str, password: str):
             if not user:
                 logger.warning(f"User not found: {email}")
                 return None
-
-            if not verify_password(password, user["hashed_password"]):
+            # ✅ Sử dụng threadpool để tránh block event loop
+            is_valid = await run_in_threadpool(verify_password, password, user["hashed_password"])
+            if not is_valid:
                 logger.warning(f"Invalid password for: {email}")
                 return None
 
