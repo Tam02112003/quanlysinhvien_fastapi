@@ -9,3 +9,4 @@ bcrypt==3.2.2
 passlib==1.7.4
 python-multipart
 faker
+argon2-cffi

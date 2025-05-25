@@ -51,7 +51,7 @@ async def get_all_students():
         try:
             stmt = await conn.prepare("""
                 SELECT id, name, email, date_of_birth, class_id 
-                FROM students
+                FROM students LIMIT 100
             """)
             students = await stmt.fetch()
             return [dict(s) for s in students]

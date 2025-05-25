@@ -1,7 +1,7 @@
 from passlib.context import CryptContext
 
 # Tạo context mã hóa với bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     """

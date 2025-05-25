@@ -27,4 +27,4 @@ COPY ./app ./app
 EXPOSE 8000
 
 # 5. Chạy ứng dụng
-CMD ["/app/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "16"]
+CMD ["/app/venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "32"]

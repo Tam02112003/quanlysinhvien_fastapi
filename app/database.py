@@ -4,7 +4,7 @@ import asyncpg
 import asyncio
 import json
 from dotenv import load_dotenv
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 import logging
 from typing import AsyncGenerator, Optional
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("LOCAL_DATABASE_URL")
 
 async def setup_connection(conn: asyncpg.Connection) -> None:
     await conn.set_type_codec(
@@ -26,13 +26,12 @@ async def setup_connection(conn: asyncpg.Connection) -> None:
     await conn.execute("SET TIME ZONE 'UTC'")
 
 POOL_CONFIG = {
-    "min_size": 20,      # Giảm từ 100
-    "max_size": 1600,     # Giảm mạnh từ 1600
-    "max_inactive_connection_lifetime": 300,
-    "timeout": 30,
-    "command_timeout": 30,
+    "min_size": 50,
+    "max_size": 200,  # Đã giảm từ 1600 để tối ưu
+    "max_inactive_connection_lifetime": 180000,
+    "timeout": 60,
+    "command_timeout": 60,
     "setup": setup_connection
-
 }
 
 class MonitoredConnection:
@@ -46,14 +45,13 @@ class MonitoredConnection:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._pool.release(self._conn)
 
-
 class MonitoredPool:
-    def __init__(self, pool: asyncpg.pool.Pool):
+    def __init__(self, pool: asyncpg.pool.Pool, max_size: int):
         self._pool = pool
         self._acquired_total = 0
         self._current_acquired = 0
         self._lock = asyncio.Lock()
-        self._last_adjustment = time.time()
+        self._max_size = max_size
 
     async def acquire(self) -> MonitoredConnection:
         conn = await self._pool.acquire()
@@ -63,23 +61,20 @@ class MonitoredPool:
         return MonitoredConnection(self, conn)
 
     async def release(self, conn: asyncpg.Connection):
-        """Giải phóng connection"""
         await self._pool.release(conn)
         async with self._lock:
             self._current_acquired -= 1
 
     async def close(self):
-        """Đóng pool"""
         await self._pool.close()
 
     @property
     def stats(self):
-        """Thống kê pool"""
         return {
-            "pool_size": self._pool._maxsize,
+            "pool_size": self._max_size,
             "acquired_total": self._acquired_total,
             "currently_acquired": self._current_acquired,
-            "available": self._pool._maxsize - self._current_acquired
+            "available": self._max_size - self._current_acquired
         }
 
 pool: Optional[MonitoredPool] = None
@@ -88,16 +83,14 @@ async def create_pool() -> MonitoredPool:
     global pool
     logger.info("Creating database pool...")
     base_pool = await asyncpg.create_pool(dsn=DATABASE_URL, **POOL_CONFIG)
-    pool = MonitoredPool(base_pool)
+    pool = MonitoredPool(base_pool, POOL_CONFIG["max_size"])
     await wait_for_database(pool)
     logger.info("Connection pool ready")
     return pool
 
-
 async def wait_for_database(pool: MonitoredPool, retries: int = 10, delay: int = 2) -> None:
     for attempt in range(retries):
         try:
-            # Thêm await trước pool.acquire()
             async with await pool.acquire() as conn:
                 start = time.time()
                 await conn.execute("SELECT 1")
@@ -119,8 +112,12 @@ async def get_connection() -> AsyncGenerator[asyncpg.Connection, None]:
     global pool
     if pool is None:
         pool = await create_pool()
-    async with await pool.acquire() as conn:
-        yield conn
+    try:
+        async with await pool.acquire() as conn:
+            yield conn
+    except asyncpg.exceptions.TooManyConnectionsError:
+        logger.error("Database connection pool exhausted")
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
 async def close_pool():
     global pool
@@ -129,17 +126,12 @@ async def close_pool():
         await pool.close()
         pool = None
 
-
 async def monitor_pool(interval: int = 5):
     while True:
         if pool:
             stats = pool.stats
             logger.info(f"POOL STATS: {stats}")
 
-            # Tự động điều chỉnh pool size
-            await pool.adjust_pool_size()
-
-            # Cảnh báo chi tiết
             if stats['available'] < 10:
                 logger.warning("⚠️ Low available connections!")
             if stats['currently_acquired'] / stats['pool_size'] > 0.9:
@@ -147,39 +139,18 @@ async def monitor_pool(interval: int = 5):
 
         await asyncio.sleep(interval)
 
-
-@asynccontextmanager
-async def get_connection() -> AsyncGenerator[asyncpg.Connection, None]:
-    global pool
-    if pool is None:
-        pool = await create_pool()
-
-    try:
-        async with await pool.acquire() as conn:
-            yield conn
-    except asyncpg.exceptions.TooManyConnectionsError:
-        logger.error("Database connection pool exhausted")
-        raise HTTPException(
-            status_code=503,
-            detail="Service temporarily unavailable"
-        )
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         await create_pool()
-        monitor_task = asyncio.create_task(monitor_pool())
-        app.state._monitor_task = monitor_task
+        app.state.monitor_task = asyncio.create_task(monitor_pool())
 
-        # Health check background task
         async def health_check():
             while True:
                 await asyncio.sleep(60)
                 await wait_for_database(pool, retries=1)
 
-        app.state._health_task = asyncio.create_task(health_check())
-
+        app.state.health_task = asyncio.create_task(health_check())
         yield
 
     except Exception as e:
@@ -187,8 +158,8 @@ async def lifespan(app: FastAPI):
         raise
     finally:
         tasks = [
-            app.state._monitor_task,
-            getattr(app.state, "_health_task", None)
+            getattr(app.state, "monitor_task", None),
+            getattr(app.state, "health_task", None)
         ]
 
         for task in tasks:
@@ -197,7 +168,7 @@ async def lifespan(app: FastAPI):
                 try:
                     await task
                 except asyncio.CancelledError:
-                    pass
+                    logger.info("[LIFESPAN] Task cancelled")
 
         await close_pool()
 
