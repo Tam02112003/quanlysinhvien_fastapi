@@ -4,11 +4,12 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from app.database import lifespan
 import logging
+import time
 
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 logger = logging.getLogger(__name__)
 # Middleware giới hạn kích thước request
@@ -23,11 +24,15 @@ async def limit_request_size(request: Request, call_next):
             status_code=413
         )
 
+    start_time = time.time()
     try:
-        return await call_next(request)
+        response = await call_next(request)
     except Exception as e:
         logger.error(f"Request error: {str(e)}")
         raise
+    process_time = (time.time() - start_time) * 1000
+    response.headers["X-Process-Time-ms"] = str(round(process_time, 2))
+    return response
 
 app.include_router(students.router)
 app.include_router(classes.router)

@@ -26,9 +26,9 @@ async def setup_connection(conn: asyncpg.Connection) -> None:
     await conn.execute("SET TIME ZONE 'UTC'")
 
 POOL_CONFIG = {
-    "min_size": 50,
-    "max_size": 200,  # Đã giảm từ 1600 để tối ưu
-    "max_inactive_connection_lifetime": 180000,
+    "min_size": 10,
+    "max_size": 300,  # Đã giảm từ 1600 để tối ưu
+    "max_inactive_connection_lifetime": 180,
     "timeout": 60,
     "command_timeout": 60,
     "setup": setup_connection

@@ -1,11 +1,11 @@
 from passlib.context import CryptContext
 
-# Tạo context mã hóa với bcrypt
+# Tạo context mã hóa với argon2 (bảo mật tốt hơn bcrypt)
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     """
-    Mã hóa mật khẩu dạng bcrypt
+    Mã hóa mật khẩu dạng argon2
     """
     return pwd_context.hash(password)
 

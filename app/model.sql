@@ -13,8 +13,6 @@ CREATE TABLE students (
     class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL
 );
 
-
-
 -- Kiểm tra các extension đã cài đặt
 SELECT * FROM pg_extension;
 -- Tạo index cho tìm kiếm
@@ -30,6 +28,8 @@ DEFERRABLE INITIALLY DEFERRED;
 -- Index cho các trường thường dùng
 CREATE INDEX IF NOT EXISTS idx_students_class ON students(class_id);
 CREATE INDEX IF NOT EXISTS idx_students_dob ON students(date_of_birth);
-
-
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+CREATE INDEX IF NOT EXISTS idx_classes_name ON classes(name);
+CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(grade);
 CREATE INDEX idx_users_email ON users(email);

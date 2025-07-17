@@ -1,9 +1,37 @@
+import time
 from app.database import get_connection
 from app.utils.security import hash_password, verify_password
 from fastapi import HTTPException
 import logging
 from fastapi.concurrency import run_in_threadpool
 logger = logging.getLogger(__name__)
+
+# LRU cache for user lookup (async compatible)
+def lru_cache_async(maxsize=1000, ttl=300):
+    def decorator(func):
+        cache = {}
+        timestamps = {}
+        async def wrapper(email):
+            now = time.time()
+            if email in cache and now - timestamps[email] < ttl:
+                return cache[email]
+            result = await func(email)
+            if len(cache) >= maxsize:
+                # Remove oldest
+                oldest = min(timestamps, key=timestamps.get)
+                cache.pop(oldest)
+                timestamps.pop(oldest)
+            cache[email] = result
+            timestamps[email] = now
+            return result
+        return wrapper
+    return decorator
+
+@lru_cache_async(maxsize=1000, ttl=300)
+async def get_user_by_email_cached(email: str):
+    async with get_connection() as conn:
+        user = await conn.fetchrow("SELECT id, username, email, hashed_password FROM users WHERE email=$1", email)
+        return dict(user) if user else None
 
 async def register_user(name: str, email: str, password: str):
     async with get_connection() as conn:
@@ -20,10 +48,13 @@ async def register_user(name: str, email: str, password: str):
                 RETURNING id, username, email
             """)
             row = await stmt.fetchrow(name, email, hashed)
+            if not row:
+                logger.error(f"Registration failed for user: {email}")
+                raise HTTPException(status_code=500, detail="Registration failed")
             return dict(row)
         except Exception as e:
             logger.error(f"Registration error: {e}")
-            raise HTTPException(status_code=500, detail="Database error")
+            raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
 async def authenticate_user(email: str, password: str):
     async with get_connection() as conn:

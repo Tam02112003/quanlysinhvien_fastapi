@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException,Request
+from fastapi import APIRouter, HTTPException, Request, Query
 from app.schemas.class_ import ClassCreate, ClassOut
 from app.crud import classes
 from app.crud.classes import get_classes_students_counts
@@ -10,8 +10,9 @@ async def class_stats():
     return await get_classes_students_counts()
 
 @router.get("/", response_model=list[ClassOut])
-async def get_all():
-    return await classes.get_all_classes()
+async def get_all(limit: int = Query(50, le=100), page: int = Query(1, ge=1)):
+    offset = (page - 1) * limit
+    return await classes.get_all_classes(limit, offset)
 
 @router.post("/", response_model=ClassOut)
 @auth_required

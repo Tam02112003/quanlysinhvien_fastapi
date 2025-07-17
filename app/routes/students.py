@@ -20,8 +20,8 @@ async def search_student_by_name(name: str = Query(..., description="Tên sinh v
 
 @router.get("/", response_model=list[StudentOut])
 @auth_required
-async def get_all(request:Request):
-    return await students.get_all_students()
+async def get_all(request:Request, page: int = Query(1, ge=1), limit: int = Query(100, le=1000)):
+    return await students.get_all_students(page=page, limit=limit)
 
 @router.get("/{student_id}", response_model=StudentOut)
 async def get_one(student_id: int):
